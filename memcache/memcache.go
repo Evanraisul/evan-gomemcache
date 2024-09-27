@@ -117,7 +117,7 @@ var (
 	resultClientErrorPrefix = []byte("CLIENT_ERROR ")
 	versionPrefix           = []byte("VERSION")
 
-	// Auth-file Related Error
+	// Authentication Related Error
 	resultUnauthenticatedError         = []byte("CLIENT_ERROR unauthenticated\r\n")
 	resultAuthenticationFailure        = []byte("CLIENT_ERROR authentication failure\r\n")
 	resultBadCommandFormat             = []byte("CLIENT_ERROR bad command line format\r\n")
@@ -191,10 +191,10 @@ type Item struct {
 	// required for a CompareAndSwap request to succeed.
 	CasID uint64
 
-	// Username for Auth-file
+	// Username for Authentication
 	User string
 
-	// Password for Auth-file
+	// Password for Authentication
 	Pass string
 }
 
@@ -640,7 +640,6 @@ func (c *Client) cas(rw *bufio.ReadWriter, item *Item) error {
 }
 
 func (c *Client) populateOne(rw *bufio.ReadWriter, verb string, item *Item) error {
-	klog.Infoln("Started PopulateOne... %v", verb)
 	if !legalKey(item.Key) {
 		return ErrMalformedKey
 	}
@@ -649,8 +648,6 @@ func (c *Client) populateOne(rw *bufio.ReadWriter, verb string, item *Item) erro
 		_, err = fmt.Fprintf(rw, "%s %s %d %d %d %d\r\n",
 			verb, item.Key, item.Flags, item.Expiration, len(item.Value), item.CasID)
 	} else {
-		klog.Infoln(rw)
-		klog.Infoln(verb, item.Key, item.Flags, item.Expiration, len(item.Value))
 
 		_, err = fmt.Fprintf(rw, "%s %s %d %d %d\r\n",
 			verb, item.Key, item.Flags, item.Expiration, len(item.Value))
@@ -671,8 +668,6 @@ func (c *Client) populateOne(rw *bufio.ReadWriter, verb string, item *Item) erro
 	if err != nil {
 		return err
 	}
-
-	klog.Infoln(string(line))
 
 	switch {
 	case bytes.Equal(line, resultStored):
@@ -803,7 +798,7 @@ func (c *Client) Close() error {
 	return ret
 }
 
-// ------------------------------------------------------------------------------------------
+// Memcached Authentication
 
 func (c *Client) SetAuth(item *Item) error {
 	return c.onItem(item, (*Client).setAuth)
@@ -819,8 +814,6 @@ func (c *Client) authFunc(rw *bufio.ReadWriter, verb string, item *Item) error {
 	}
 	var err error
 	if verb == "set" {
-		klog.Infoln("Auth Started & Get the Set Command")
-		klog.Infoln(rw)
 		klog.Infoln(verb, item.Key, item.Flags, item.Expiration, len(item.User)+len(item.Pass)+1, item.User, item.Pass)
 
 		_, err = fmt.Fprintf(rw, "%s %s %d %d %d\r\n%s %s\r\n",
@@ -833,10 +826,6 @@ func (c *Client) authFunc(rw *bufio.ReadWriter, verb string, item *Item) error {
 		klog.Errorf(err.Error())
 		return err
 	}
-	/*if _, err := rw.Write(crlf); err != nil {
-		klog.Errorf(err.Error())
-		return err
-	}*/
 	if err := rw.Flush(); err != nil {
 		klog.Errorf(err.Error())
 		return err
