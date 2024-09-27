@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"k8s.io/klog/v2"
 	"net"
 	"strconv"
 	"strings"
@@ -328,17 +327,14 @@ func (c *Client) getConn(addr net.Addr) (*conn, error) {
 func (c *Client) onItem(item *Item, fn func(*Client, *bufio.ReadWriter, *Item) error) error {
 	addr, err := c.selector.PickServer(item.Key)
 	if err != nil {
-		klog.Errorf(err.Error())
 		return err
 	}
 	cn, err := c.getConn(addr)
 	if err != nil {
-		klog.Errorf(err.Error())
 		return err
 	}
 	defer cn.condRelease(&err)
 	if err := fn(c, cn.rw, item); err != nil {
-		klog.Errorf(err.Error())
 		return err
 	}
 	return nil
@@ -448,8 +444,6 @@ func (c *Client) ping(addr net.Addr) error {
 		if err != nil {
 			return err
 		}
-
-		klog.Infoln(string(line))
 
 		switch {
 		case bytes.HasPrefix(line, versionPrefix):
@@ -813,49 +807,31 @@ func (c *Client) authFunc(rw *bufio.ReadWriter, verb string, item *Item) error {
 		return ErrMalformedKey
 	}
 	var err error
-	if verb == "set" {
-		klog.Infoln(verb, item.Key, item.Flags, item.Expiration, len(item.User)+len(item.Pass)+1, item.User, item.Pass)
-
-		_, err = fmt.Fprintf(rw, "%s %s %d %d %d\r\n%s %s\r\n",
-			verb, item.Key, item.Flags, item.Expiration, len(item.User)+len(item.Pass)+1, item.User, item.Pass)
-		if err != nil {
-			klog.Errorf(err.Error())
-		}
-	}
+	_, err = fmt.Fprintf(rw, "%s %s %d %d %d\r\n%s %s\r\n",
+		verb, item.Key, item.Flags, item.Expiration, len(item.User)+len(item.Pass)+1, item.User, item.Pass)
 	if err != nil {
-		klog.Errorf(err.Error())
 		return err
 	}
 	if err := rw.Flush(); err != nil {
-		klog.Errorf(err.Error())
 		return err
 	}
 	line, err := rw.ReadSlice('\n')
 
-	klog.Infoln(string(line))
-
 	if err != nil {
-		klog.Errorf(err.Error())
 		return err
 	}
 	switch {
 	case bytes.Equal(line, resultStored):
-		klog.Infoln("Okay")
 		return nil
 	case bytes.Equal(line, resultUnauthenticatedError):
-		klog.Infoln("ErrNotAuthenticated")
 		return ErrNotAuthenticated
 	case bytes.Equal(line, resultAuthenticationFailure):
-		klog.Infoln("ErrNotAuthenticated")
 		return ErrNotAuthenticated
 	case bytes.Equal(line, resultBadCommandFormat):
-		klog.Infoln("ErrNotAuthenticated")
 		return ErrNotAuthenticated
 	case bytes.Equal(line, resultBadCommandFormatTermination):
-		klog.Infoln("ErrNotAuthenticated")
 		return ErrNotAuthenticated
 	case bytes.Equal(line, resultBadAuthenticationTokenFormat):
-		klog.Infoln("ErrNotAuthenticated")
 		return ErrNotAuthenticated
 	}
 	return fmt.Errorf("memcache: unexpected response line from %q: %q", verb, string(line))
